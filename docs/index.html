@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Florida State Jobs</title>
+<meta name="description" content="Daily-updated dashboard of open State of Florida job postings: hiring by agency, salaries, and data roles.">
+<style>
+:root {
+  color-scheme: light;
+  --surface: #fcfcfb; --card: #ffffff; --border: #e6e5e1;
+  --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #77766f;
+  --series-1: #2a78d6; --track: #efeeea; --grid: #e6e5e1;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface: #1a1a19; --card: #222221; --border: #34342f;
+    --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #94938a;
+    --series-1: #3987e5; --track: #2c2c2a; --grid: #34342f;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: #1a1a19; --card: #222221; --border: #34342f;
+  --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #94938a;
+  --series-1: #3987e5; --track: #2c2c2a; --grid: #34342f;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--surface); color: var(--text-primary);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1100px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.01em; }
+h2 { font-size: 15px; margin: 0 0 12px; }
+.sub { color: var(--text-secondary); margin: 0 0 24px; }
+.sub a, td a { color: inherit; }
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); margin-bottom: 16px; }
+.kpis { grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-width: 0; }
+.kpi .v { font-size: 30px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.kpi .l { color: var(--text-secondary); font-size: 13px; }
+.note { color: var(--text-muted); font-size: 13px; margin: 8px 0 0; }
+.bars { display: grid; gap: 6px; }
+.bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; font-size: 13px; padding: 2px 4px; border-radius: 6px; outline: none; }
+.bar:hover, .bar:focus { background: var(--track); }
+.bar .n { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar .val { font-variant-numeric: tabular-nums; }
+.bar .track { grid-column: 1 / -1; height: 8px; background: var(--track); border-radius: 4px; }
+.bar .fill { height: 100%; background: var(--series-1); border-radius: 4px; }
+#trend, #posted { width: 100%; height: 200px; display: block; }
+#trend text, #posted text { fill: var(--text-muted); font-size: 11px; }
+#tip { position: fixed; pointer-events: none; background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 10px; font-size: 13px; display: none; box-shadow: 0 4px 12px rgb(0 0 0 / .12); }
+#tip b { display: block; font-variant-numeric: tabular-nums; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 12px; }
+.filters input[type=search] { width: 280px; }
+.filters input[type=search], .filters select { font: inherit; padding: 6px 10px; border: 1px solid var(--border);
+  border-radius: 8px; background: var(--surface); color: var(--text-primary); min-width: 0; max-width: 100%; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--text-secondary); font-weight: 600; white-space: nowrap; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.count { color: var(--text-muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Florida State Jobs</h1>
+  <p class="sub">Every open posting on <a href="https://jobs.myflorida.com">jobs.myflorida.com</a>, scraped daily by a
+    GitHub Actions pipeline. Updated <span id="updated">…</span> · <a href="https://github.com/GOPIVARDHAN1965/job-scanner-2026">source</a></p>
+
+  <div class="grid kpis">
+    <div class="card kpi"><div class="v" id="k-open">–</div><div class="l">open postings</div></div>
+    <div class="card kpi"><div class="v" id="k-new">–</div><div class="l">new in the last 7 days</div></div>
+    <div class="card kpi"><div class="v" id="k-agencies">–</div><div class="l">agencies hiring</div></div>
+    <div class="card kpi"><div class="v" id="k-salary">–</div><div class="l">median starting salary (annual)</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <h2>Postings by date posted, last 60 days</h2>
+    <svg id="posted" role="img" aria-label="Currently open postings by the date they were posted"></svg>
+    <p class="note">Counts postings that are still open, so older days undercount jobs that have since closed.</p>
+  </div>
+  <div class="card" id="history-card" style="margin-bottom:16px">
+    <h2>Open postings over time</h2>
+    <svg id="trend" role="img" aria-label="Open postings per day, from the daily pipeline history"></svg>
+  </div>
+
+  <div class="grid">
+    <div class="card"><h2>Openings by agency</h2><div class="bars" id="agencies"></div></div>
+    <div class="card"><h2>Median starting salary by job category</h2><div class="bars" id="categories"></div>
+      <p class="note">Categories with 5+ postings that list a salary.</p></div>
+    <div class="card"><h2>Openings by city</h2><div class="bars" id="cities"></div></div>
+  </div>
+
+  <div class="card">
+    <h2>Open postings</h2>
+    <div class="filters">
+      <input type="search" id="q" placeholder="Search title, agency, city" aria-label="Search postings">
+      <select id="agency" aria-label="Agency"><option value="">All agencies</option></select>
+      <label><input type="checkbox" id="data-only"> Data &amp; tech roles only</label>
+      <span class="count" id="count"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Title</th><th>Agency</th><th>City</th><th style="text-align:right">Salary (annual)</th><th>Posted</th><th>Closes</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <p class="note" id="more"></p>
+  </div>
+</main>
+<div id="tip" role="tooltip"></div>
+<script>
+const $ = id => document.getElementById(id);
+const money = n => n == null ? '—' : '$' + Math.round(n / 1000) + 'k';
+const fmtDate = s => s ? new Date(s + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
+const median = a => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y), m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+const tip = $('tip');
+function showTip(e, value, label) {
+  tip.replaceChildren(Object.assign(document.createElement('b'), { textContent: value }), label);
+  tip.style.display = 'block';
+  const r = e.target.getBoundingClientRect?.() ?? { left: e.clientX, top: e.clientY, bottom: e.clientY };
+  const x = e.clientX ?? r.left, y = e.clientY ?? r.bottom;
+  tip.style.left = Math.min(x + 12, innerWidth - tip.offsetWidth - 8) + 'px';
+  tip.style.top = (y + 16) + 'px';
+}
+const hideTip = () => tip.style.display = 'none';
+
+function bars(el, rows, fmt) {
+  const max = Math.max(...rows.map(r => r[1]));
+  el.replaceChildren(...rows.map(([name, v, extra]) => {
+    const row = document.createElement('div'); row.className = 'bar'; row.tabIndex = 0;
+    const n = document.createElement('span'); n.className = 'n'; n.textContent = name;
+    const val = document.createElement('span'); val.className = 'val'; val.textContent = fmt(v);
+    const track = document.createElement('div'); track.className = 'track';
+    const fill = document.createElement('div'); fill.className = 'fill'; fill.style.width = (v / max * 100) + '%';
+    track.append(fill); row.append(n, val, track);
+    const t = e => showTip(e, fmt(v), name + (extra ? ' · ' + extra : ''));
+    row.addEventListener('pointermove', t); row.addEventListener('focus', t);
+    row.addEventListener('pointerleave', hideTip); row.addEventListener('blur', hideTip);
+    return row;
+  }));
+}
+
+function groupBy(jobs, key) {
+  const m = new Map();
+  for (const j of jobs) { const k = j[key] || 'Unknown'; (m.get(k) || m.set(k, []).get(k)).push(j); }
+  return m;
+}
+
+// points: [{date, v, tip}] -> single-series line with crosshair tooltip
+function line(svg, points, unit) {
+  const W = svg.clientWidth || 600, H = 200, P = { l: 40, r: 12, t: 12, b: 24 };
+  const step = 10 ** Math.floor(Math.log10(Math.max(...points.map(p => p.v), 1)));
+  const hi = Math.ceil(Math.max(...points.map(p => p.v), 1) / step) * step;
+  const x = i => P.l + i * (W - P.l - P.r) / Math.max(points.length - 1, 1);
+  const y = v => H - P.b - v / hi * (H - P.t - P.b);
+  const ns = 'http://www.w3.org/2000/svg', el = (t, a) => { const e = document.createElementNS(ns, t); for (const k in a) e.setAttribute(k, a[k]); return e; };
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const kids = [];
+  for (const v of [0, hi / 2, hi]) {
+    kids.push(el('line', { x1: P.l, x2: W - P.r, y1: y(v), y2: y(v), stroke: 'var(--grid)' }));
+    const t = el('text', { x: P.l - 6, y: y(v) + 4, 'text-anchor': 'end' }); t.textContent = Math.round(v).toLocaleString(); kids.push(t);
+  }
+  for (const i of [0, points.length - 1]) {
+    const t = el('text', { x: x(i), y: H - 6, 'text-anchor': i ? 'end' : 'start' });
+    t.textContent = fmtDate(points[i].date); kids.push(t);
+  }
+  kids.push(el('polyline', { points: points.map((p, i) => `${x(i)},${y(p.v)}`).join(' '), fill: 'none',
+    stroke: 'var(--series-1)', 'stroke-width': 2, 'stroke-linejoin': 'round' }));
+  const hair = el('line', { y1: P.t, y2: H - P.b, stroke: 'var(--text-muted)', visibility: 'hidden' });
+  const dot = el('circle', { r: 4, fill: 'var(--series-1)', stroke: 'var(--card)', 'stroke-width': 2, visibility: 'hidden' });
+  kids.push(hair, dot);
+  svg.replaceChildren(...kids);
+  svg.onpointermove = e => {
+    const r = svg.getBoundingClientRect(), px = (e.clientX - r.left) * W / r.width;
+    const i = Math.max(0, Math.min(points.length - 1, Math.round((px - P.l) / (W - P.l - P.r) * (points.length - 1))));
+    const p = points[i];
+    hair.setAttribute('x1', x(i)); hair.setAttribute('x2', x(i));
+    dot.setAttribute('cx', x(i)); dot.setAttribute('cy', y(p.v));
+    hair.setAttribute('visibility', 'visible'); dot.setAttribute('visibility', 'visible');
+    showTip(e, p.v.toLocaleString() + ' ' + unit, fmtDate(p.date) + (p.tip ? ' · ' + p.tip : ''));
+  };
+  svg.onpointerleave = () => { hideTip(); hair.setAttribute('visibility', 'hidden'); dot.setAttribute('visibility', 'hidden'); };
+}
+
+fetch('data.json').then(r => r.json()).then(d => {
+  const jobs = d.jobs;
+  $('updated').textContent = new Date(d.updated + 'T00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const weekAgo = new Date(d.updated + 'T00:00'); weekAgo.setDate(weekAgo.getDate() - 7);
+  $('k-open').textContent = jobs.length.toLocaleString();
+  $('k-new').textContent = jobs.filter(j => new Date(j.p + 'T00:00') > weekAgo).length.toLocaleString();
+  const byAgency = groupBy(jobs, 'a');
+  $('k-agencies').textContent = byAgency.size;
+  $('k-salary').textContent = money(d.median_salary);
+
+  // postings per posted-date over the last 60 days (zero-filled), from currently open postings
+  const perDay = new Map(), end = new Date(d.updated + 'T00:00');
+  for (let i = 59; i >= 0; i--) { const t = new Date(end); t.setDate(t.getDate() - i); perDay.set(t.toLocaleDateString('en-CA'), 0); }
+  for (const j of jobs) if (perDay.has(j.p)) perDay.set(j.p, perDay.get(j.p) + 1);
+  const posted = [...perDay].map(([date, v]) => ({ date, v }));
+  const history = d.trend.map(t => ({ date: t.date, v: t.open, tip: t.new + ' new' }));
+  $('history-card').hidden = history.length < 2;
+  const draw = () => { line($('posted'), posted, 'postings'); if (history.length > 1) line($('trend'), history, 'open'); };
+  draw(); addEventListener('resize', draw);
+
+  const top = (m, n) => [...m].sort((a, b) => b[1].length - a[1].length).slice(0, n);
+  bars($('agencies'), top(byAgency, 12).map(([k, v]) => [k, v.length, 'median ' + money(median(v.map(j => j.lo).filter(Boolean)))]), n => n.toLocaleString());
+  bars($('cities'), top(groupBy(jobs, 'l'), 12).map(([k, v]) => [k, v.length]), n => n.toLocaleString());
+  bars($('categories'), [...groupBy(jobs.filter(j => j.lo), 'c')].filter(([, v]) => v.length >= 5)
+    .map(([k, v]) => [k, median(v.map(j => j.lo)), v.length + ' postings']).sort((a, b) => b[1] - a[1]).slice(0, 12), money);
+
+  const sel = $('agency');
+  [...byAgency.keys()].sort().forEach(a => sel.append(new Option(a, a)));
+  const LIMIT = 200;
+  function render() {
+    const q = $('q').value.trim().toLowerCase(), a = sel.value, dOnly = $('data-only').checked;
+    const hits = jobs.filter(j => (!a || j.a === a) && (!dOnly || j.d) && (!q || (j.t + ' ' + j.a + ' ' + j.l).toLowerCase().includes(q)));
+    $('count').textContent = hits.length.toLocaleString() + ' postings';
+    $('rows').replaceChildren(...hits.slice(0, LIMIT).map(j => {
+      const tr = document.createElement('tr');
+      const link = Object.assign(document.createElement('a'), { href: 'https://jobs.myflorida.com' + j.u, textContent: j.t, target: '_blank', rel: 'noopener' });
+      const td = (v, cls) => Object.assign(document.createElement('td'), { textContent: v, className: cls || '' });
+      const t = document.createElement('td'); t.append(link);
+      const sal = j.lo == null ? '—' : j.hi && j.hi !== j.lo ? `${money(j.lo)}–${money(j.hi)}` : money(j.lo);
+      tr.append(t, td(j.a), td(j.l), td(sal, 'num'), td(fmtDate(j.p)), td(fmtDate(j.x)));
+      return tr;
+    }));
+    $('more').textContent = hits.length > LIMIT ? `Showing the ${LIMIT} newest. Narrow the search to see more.` : '';
+  }
+  for (const id of ['q', 'agency', 'data-only']) $(id).addEventListener('input', render);
+  render();
+});
+</script>
+</body>
+</html>
